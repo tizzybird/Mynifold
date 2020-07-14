@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="semantic.min.css">
+    <link rel="stylesheet" href="popup.css">
+    <script src="jquery-3.1.1.min.js"></script>
+    <script src="semantic.min.js"></script>
+    <script defer src="popup.js"></script>
+  </head>
+  <body>
+    <div id="app" name="container" class="container">
+      <h1>List</h1>
+      <!-- <div id="loader" class="ui active dimmer">
+        <div class="ui text loader">Loading</div>
+      </div> -->
+      <div id="listMount" style="flex:1; overflow-y: scroll;"></div>
+    </div>
+    <template id="content">
+      <div class="ui unstackable items">
+        <div class="item info-panel">
+          <div class="content">
+            <h3 name="title" class="info-title">Title</h3>
+            <p name="channel" class="info-description">Channel</p>
+          </div>
+          <div class="image">
+            <img name="info-thumbnail" src="default.png">
+          </div>
+        </div>
+      </div>
+      <div name="controlMount" class="controls ui segment">
+        <!-- <div name="control-bar" class="control-bar">
+            <button name="goto" class="control-btn"><i class="fa-lg fa fa-external-link flipped"></i></button>
+            <button name="pip" class="control-btn"><i class="fa-lg fa fa-compress flipped"></i></button>
+            <button class="control-btn"><i class="fa-lg fa fa-step-backward"></i></button>
+            <button name="mid" class="control-btn mid"><i class="fa-lg fa fa-play"></i></button>
+            <button class="control-btn"><i class="fa-lg fa fa-step-forward"></i></button>
+            <button name="repeat" class="control-btn"><i class="fa-lg fa fa-repeat"></i></button>
+        </div> -->
+      <div name="lyrics-panel" class="lyrics-panel">
+      </div>
+    </template>
+    <template id="card">
+      <div class="card">
+        <div class="card-info">
+          <div name="info" class="marquee">
+            <h4 name="title" class="card-title">Title</h4>
+            <p name="channel" class="card-description">Channel</p>
+          </div>
+          <!-- <div name="preview"> -->
+            <!-- <div class="image">
+              <img name="info-thumbnail" src="default.png">
+            </div> -->
+          <!-- </div> -->
+        </div>
+        <!-- <div name="control" class="control-bar">
+          <button name="mid" class="control-btn"><i class="fa-lg fa fa-play"></i></button>
+          <button name="repeat" class="control-btn"><i class="fa-lg fa fa-repeat"></i></button>
+        </div> -->
+        <div name="controlMount" class="small"></div>
+      </div>
+    </template>
+    
+    <template id="control">
+      <div name="control-bar" class="control-bar">
+        <div name="panel1" class="control-panel">
+          <button name="goto" class="control-btn"><i class="fa-sm fa fa-external-link flipped"></i></button>
+          <button name="pip" class="control-btn"><i class="fa-sm fa fa-compress flipped"></i></button>
+        </div>
+        <div class="divider"></div>
+        <div name="panel2" class="control-panel mid">
+          <button class="control-btn"><i class="fa-sm fa fa-step-backward"></i></button>
+          <button name="play" class="control-btn mid"><i class="fa-sm fa fa-play"></i></button>
+          <button name="next" class="control-btn"><i class="fa-sm fa fa-step-forward"></i></button>
+          <button name="repeat" class="control-btn"><i class="fa-sm fa fa-repeat"></i></button>
+        </div>
+        <div class="divider"></div>
+        <div name="panel3" class="control-panel">
+          <button name="lyrics" class="control-btn"><i class="fa-sm fa fa-music"></i></button>
+        </div>
+      </div>  
+    </template>
+  </body>
+</html>
