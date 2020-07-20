@@ -1,35 +1,31 @@
-console.log("content script is running", document.readyState)
-
 let video = null
 let setPropagation = true
 let isPlaying = false
 let isInPip = false
-let info = null
-document.addEventListener('readystatechange', event => {
-    if (document.readyState == 'complete') {
+
+console.log("content script is running", document.readyState)
+initialize()
+// document.addEventListener('readystatechange', (event) => {
+//     console.log(document.readyState, event)
+//     // log.textContent = log.textContent + `readystate: ${document.readyState}\n`;
+// });
+
+function initialize(isReset=false) {
+    console.log('initializing content script')
+    video = null
+    setPropagation = true
+    isPlaying = false
+    isInPip = false
+    let videoFetcher = setTimeout(function check1() {
+        console.log("fetching..")
         video = document.querySelector('video')
-        registerVideoEventHandlers(video)
-        console.log('registering from content')
-        chrome.runtime.sendMessage({ media: 'register'}, response => {
-            info = response
-        })    
-    }
-})
-
-// window.addEventListener('load', event => {
-//     video = document.querySelector('video')
-//     registerVideoEventHandlers(video)
-//     console.log('registering from content')
-//     chrome.runtime.sendMessage({ media: 'register'}, response => {
-//         info = response
-//     })
-// })
-
-window.addEventListener('beforeunload', event => {
-    chrome.runtime.sendMessage({ media: 'unregister'}, response => {
-        console.log('content script is closed')
-    })
-})
+        
+        if (video == null)
+            videoFetcher = setTimeout(check1, 300)
+        else if (!isReset)
+            registerVideoEventHandlers(video)
+    }, 300)
+}
 
 function registerVideoEventHandlers(video) {
     video.addEventListener('playing', event => {
@@ -63,27 +59,35 @@ function fetchCurrentInfo() {
         let counter = 0
         let timer = setTimeout(function check() {
             console.log(document.readyState, counter)
-            if (counter == 10)
+            if (counter == 20) {
+                console.log('in reject')
                 reject({error: true})
-            if (document.readyState == 'loading') {
+            }
+                
+            if (document.readyState != 'complete') {
                 counter++
                 timer = setTimeout(check, 300)
             }
         }, 300)
-        
-        let url = info == null ? window.location.href : info.url
+        let url = window.location.href
         let result = {isPlaying, isInPip}
         result['title']     = document.querySelector('h1').children[0].innerText
-        result['channel']   = document.querySelector('#channel-name').querySelector('a').innerText
+        result['channel']   = document.querySelector('div#upload-info.style-scope').querySelector('a').innerText
         result['videoId']   = url.split("&")[0].split("v=")[1]
-        result['next']      = document.querySelector('ytd-compact-autoplay-renderer')
-                                .querySelector('#thumbnail').href
+        result['next']      = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#thumbnail').href
+        result['loop']      = video.loop
+        result['avatar']    = document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer').querySelector('img').src
         console.log(result)
         resolve(result)
     })
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.content == 'reset') {
+        console.log('resetting content script')
+        initialize(true)
+    }   
+    
     if (request.control == 'play') {
         setPropagation = false
         video.play().then(result => {
@@ -123,4 +127,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // })
         // return true
     }
-})
+})   

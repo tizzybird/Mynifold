@@ -149,6 +149,11 @@
 .card-info > [name='preview'] {
     flex: 1
 }
+.card-avatar {
+    margin-right: 10px;
+    max-width: 42px;
+    border-radius: 50%;
+}
 .card-title {
     font-size: 16px;
     margin-top: 7px;

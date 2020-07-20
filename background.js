@@ -1,70 +1,72 @@
 'use strict';
-
-let refresh = false
 console.log("background is running")
-chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-  console.log(changeInfo, tab)
-  // if (changeInfo.status == 'loading') {
-  //   if (changeInfo.url != undefined && changeInfo.url.match('*://*youtube.com/watch*')) {
-  //     let newItem = {
-  //       tabId: 
-  //       url: sender.url
-  //     }
-  //   } else {
 
-  //   }
-  // }
-  // alert('updated from contentscript');
-  // console.log('youtube', changeInfo)
-})
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.media == 'register') {
-    console.log('registering a media')
-    let newItem = {
-      tabId: sender.tab.id,
-      favIconUrl: sender.tab.favIconUrl,
-      url: sender.url
+// chrome.tabs.onAttached.addListener(function(tabId, detachInfo) {
+//   console.log("attach", detachInfo)
+// })
+
+// chrome.tabs.onDetached.addListener(function(tabId, detachInfo) {
+//   console.log("detach", detachInfo)
+// })
+
+chrome.tabs.onRemoved.addListener(function(tabId, removeInfo) {
+  console.log("closing", tabId, removeInfo)
+  chrome.storage.sync.get(['media'], data => {
+    let mediaItems = data.media || {}
+    if (mediaItems != undefined && mediaItems[tabId] != undefined) {
+      console.log('deleting ' + tabId)
+      delete mediaItems[tabId]
+      chrome.storage.sync.set({
+        media: mediaItems,
+        action: 'delete',
+        item: tabId
+      }, function() {console.log("deletion done!")})
     }
-    if (refresh) {
-      chrome.storage.sync.clear(() => {
-        console.log('storage is cleared')
-        chrome.storage.sync.get(['media'], data => {
-          console.log(data)
-          let mediaItems = data.media || {}
-          mediaItems[sender.tab.id] = newItem
-          // mediaItems.push(newItem)
-          chrome.storage.sync.set({
-            media: mediaItems,
-            action: 'add',
-            item: sender.tab.id
-          }, () => { sendResponse(Object.assign({}, newItem)) })
-        })
-      })
-      
-    } else {
+  })
+})
+
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
+  if (changeInfo.status == 'loading') {
+    if (changeInfo.url != undefined && changeInfo.url.match('youtube.com/watch.')) {
       chrome.storage.sync.get(['media'], data => {
         let mediaItems = data.media || {}
-        mediaItems[sender.tab.id] = newItem
+        // 1. not in store, create
+        if (mediaItems[tabId] == undefined) {
+          chrome.tabs.executeScript(tabId, {file: 'content.js'})
+        // 2. in store, reset; // send message to tabId
+        } else {
+          console.log('reset!')
+          chrome.tabs.sendMessage(tabId, {content: 'reset'})
+        }
+        console.log('add favIcon', tab)
+        mediaItems[tabId] = {
+          tabId: tabId,
+          windowId: tab.windowId,
+          favIconUrl: tab.favIconUrl,
+          url: tab.url,
+          isActive: true
+        }
+        // update to the data store
         chrome.storage.sync.set({
           media: mediaItems,
           action: 'add',
-          item: sender.tab.id
-        }, () => { sendResponse(Object.assign({}, newItem)) })
+          item: tabId
+        })
+      })
+    } else {
+      chrome.storage.sync.get(['media'], data => {
+        let mediaItems = data.media || {}
+        // 3. update status of the mediaItem
+        if (mediaItems != undefined && mediaItems[tabId] != undefined) {
+          mediaItems[tabId]['isActive'] = false
+          chrome.storage.sync.set({
+            media: mediaItems,
+            action: 'freeze',
+            item: tabId
+          })
+        }
+        // 4. nothing match, do nothing
       })
     }
   }
-  // TODO
-  if (request.media == 'unregister') {
-    console.log('unregistering media ', sender.tab.id)
-    chrome.storage.sync.get(['media'], data => {
-      let mediaItems = data.media
-      delete mediaItems[sender.tab.id]
-      chrome.storage.sync.set({
-        media: mediaItems,
-        action: 'remove',
-        item: sender.tab.id
-      }, () => { sendResponse({ done: true }) })
-    })
-  }
-  return true
 })
