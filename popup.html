@@ -14,7 +14,9 @@
       <!-- <div id="loader" class="ui active dimmer">
         <div class="ui text loader">Loading</div>
       </div> -->
-      <div id="listMount" style="flex:1; overflow-y: scroll;"></div>
+      <div id="listMount" style="flex:1; overflow-y: scroll; padding-top: 9px; padding-right: 3px">
+      <!-- <div class="ui loader">Loading</div> -->
+      </div>
     </div>
     <template id="content">
       <div class="ui unstackable items">
@@ -42,6 +44,9 @@
     </template>
     <template id="card">
       <div class="card">
+        <button name="cancel" class="cancel-btn">
+          <i class="fa-times fa"></i>
+        </button>
         <div class="card-info">
           <div>
             <img name="avatar" class="card-avatar">
@@ -74,7 +79,9 @@
         <div name="panel2" class="control-panel mid">
           <button class="control-btn"><i class="fa-sm fa fa-step-backward"></i></button>
           <button name="play" class="control-btn mid"><i class="fa-sm fa fa-play"></i></button>
-          <button name="next" class="control-btn"><i class="fa-sm fa fa-step-forward"></i></button>
+          <button name="next" class="control-btn">
+            <i class="fa-sm fa fa-step-forward"></i>
+          </button>
           <button name="repeat" class="control-btn"><i class="fa-sm fa fa-repeat"></i></button>
         </div>
         <div class="divider"></div>

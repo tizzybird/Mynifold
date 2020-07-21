@@ -6,26 +6,33 @@ const cardTemplate = document.querySelector('template#card')
 const controlTemplate = document.querySelector('template#control')
 // when opening the popup
 chrome.storage.sync.get(['media'], function(data) {
+  // TODO: show default page
   if (data.media == undefined)
     return
-
-  // let keys = Object.keys(data.media)
-  // console.log(data)
+    
   showCards(data.media)
 });
 
 chrome.storage.onChanged.addListener(function(changes, namespace) {
-  console.log(changes)
-  // if (changes.action == 'add') {
-  //   console.log('add', changes.item)
-  //   // showCards(changes.media)
-  // }
-  // if (changes.action == 'remove') {
-  //   console.log('remove', changes.item)
-  // }
+  console.log(changes, changes.action.newValue.operation)
+  if (changes.action.newValue.operation == 'create') {
+    // const listMount = document.querySelector('#listMount')
+    // while (listMount.firstElementChild)
+    //   listMount.removeChild(listMount.firstElementChild)
+    // showCards(changes.media.newValue)
+    addCard(changes.media.newValue[changes.action.newValue.item])
+  }
 })
 
-// single content
+// TODO: loading animation
+function setLoading(isLoading) {
+  const listMount = document.querySelector('#listMount')
+  if (isLoading) {
+  } else {
+  }
+}
+
+// DEPRECATED: single content
 function showContent(item) {
   console.log('showing content')
   const clone = contentTemplate.content.cloneNode(true)
@@ -33,7 +40,7 @@ function showContent(item) {
   const gotoBtn = clone.querySelector("button[name='goto']")
   const pipBtn  = clone.querySelector("button[name='pip']")
   const repeatBtn = clone.querySelector("button[name='repeat']")
-  gotoBtn.onclick   = onGotoClick(item.tabId)
+  gotoBtn.onclick   = onGotoClick(item.windowId, item.tabId)
   chrome.tabs.sendMessage(item.tabId, {askInitInfo: true}, response => {
     console.log(response)
     clone.querySelector('h3').innerText = response.title
@@ -51,39 +58,50 @@ function showContent(item) {
   // app.replaceChild(document.querySelector('#list'), newDiv)
 }
 
-// multiple contents
-function showCards(data) {
-  const keys = Object.keys(data)
+function addCard(currItem) {
   const listMount = document.querySelector('#listMount')
-  console.log('card data', data)
-  // keys.sort((a, b) => a - b)
-  for (let key of keys) {
-    const currItem = data[key]
-    if (!currItem.isActive)
-      continue
-
+  let hook = setTimeout(function ask() {
     // since this is async, the order may not be precise
     chrome.tabs.sendMessage(currItem.tabId, {askInitInfo: true}, response => {
+      console.log(currItem.tabId, response)
+      if (response == undefined || Object.keys(response).length == 0) {
+        hook = setTimeout(ask, 700)
+        return
+      }
+        
       let cardClone = cardTemplate.content.cloneNode(true)
       
       // init info
-      cardClone.firstElementChild.id = key
+      cardClone.firstElementChild.id = currItem.tabId
       cardClone.querySelector("[name='title']").innerText = response.title
       cardClone.querySelector("[name='channel']").innerText = response.channel
       cardClone.querySelector("[name='avatar'").src = response.avatar
+      cardClone.querySelector("[name='cancel']").onclick = onCancelClick(currItem.tabId, cardClone.firstElementChild)
       // cardClone.querySelector('img').src = `https://img.youtube.com/vi/${response.videoId}/default.jpg`
       // cardClone.firstElementChild.firstElementChild.onclick = cardClickHandler()
       
       // init control
       const controlMount = cardClone.querySelector('[name=controlMount]')
-      const controlClone = initControl(currItem.tabId, response)
+      const controlClone = initControl(currItem.windowId, currItem.tabId, response, cardClone.firstElementChild)
       controlMount.appendChild(controlClone)
       listMount.appendChild(cardClone)
     })
+  }, 300)
+}
+
+// multiple contents
+function showCards(data) {
+  const keys = Object.keys(data)
+  console.log('card data', data)
+
+  for (let key of keys) {
+    const currItem = data[key]
+    if (currItem.isActive)
+      addCard(currItem)
   }
 }
 
-function initControl(tabId, info) {
+function initControl(windowId, tabId, info, self) {
   let controlClone = controlTemplate.content.cloneNode(true)
   const gotoBtn = controlClone.querySelector("button[name='goto']")
   const pipBtn  = controlClone.querySelector("button[name='pip']")
@@ -91,27 +109,44 @@ function initControl(tabId, info) {
   const nextBtn = controlClone.querySelector("button[name='next']")
   const repeatBtn = controlClone.querySelector("button[name='repeat']")
   
-  playBtn.onclick = onPlayClick(tabId, playBtn, info.isPlaying)
-  gotoBtn.onclick   = onGotoClick(tabId)
+  playBtn.onclick   = onPlayClick(tabId, playBtn, info.isPlaying)
+  gotoBtn.onclick   = onGotoClick(windowId, tabId)
   pipBtn.onclick    = onPipClick(tabId, pipBtn, info.isInPip)
-  nextBtn.onclick   = onNextClick(tabId, nextBtn, info.next)
+  nextBtn.onclick   = onNextClick(tabId, info.next, self)
   repeatBtn.onclick = onRepeatClick(tabId, repeatBtn, info.loop)
 
+  nextBtn.title = info.nextTitle
+
   return controlClone
+}
+
+function onCancelClick(tabId, self) {
+  return function() {
+    chrome.tabs.remove(tabId, function() {
+      self.remove()
+    })
+  }
 }
 
 /////////////////
 // control bar //
 /////////////////
 
-function onGotoClick(tabId) {
+function onGotoClick(windowId, tabId) {
   return function(event) {
-    chrome.tabs.update(tabId, {active: true})
+    chrome.windows.getCurrent(curr => {
+      if (curr.id == windowId) {
+        chrome.tabs.update(tabId, {active: true})
+      } else {
+        chrome.windows.update(windowId, {focused: true}, () => {
+          chrome.tabs.update(tabId, {active: true})
+        })
+      }
+    })
   }
 }
 
 function onPipClick(tabId, btn, setPip) {
-  // let icon = btn.querySelector('i')
   if (setPip)
     btn.classList.toggle('active')
   
@@ -132,15 +167,10 @@ function onRepeatClick(tabId, btn, setRepeat) {
   return function(event) {
     btn.classList.toggle('active')
     if (btn.classList.contains('active')) {
-      // btn.classList.remove('active')
       chrome.tabs.sendMessage(tabId, {control: 'setRepeat'})
-      // chrome.tabs.sendMessage(tabId, {control: 'unsetRepeat'})
     } else {
-      // btn.classList.add('active')
-      // chrome.tabs.sendMessage(tabId, {control: 'setRepeat'})
       chrome.tabs.sendMessage(tabId, {control: 'unsetRepeat'})
     }
-    // setRepeat = !setRepeat
   }
 }
 
@@ -153,8 +183,6 @@ function onPlayClick(tabId, btn, isPlaying) {
   }
 
   return function(event) {
-    // icon.classList.toggle('fa-pause')
-    // icon.classList.toggle('fa-play')
     if (icon.classList.contains('fa-play')) {
       chrome.tabs.sendMessage(tabId, {control: 'play'}, response => {
         if (response && response.success) {
@@ -170,11 +198,31 @@ function onPlayClick(tabId, btn, isPlaying) {
   }
 }
 
-function onNextClick(tabId, btn, url) {
-  // todo: bound hover effect
+function onNextClick(tabId, url, self) {
   return function() {
-    // todo: update
-    chrome.tabs.update(tabId, {url})
+    chrome.tabs.update(tabId, {url}, function() {
+      console.log('clicked!')
+      let hook = setTimeout(function ask() {
+        chrome.tabs.sendMessage(tabId, {askInitInfo: true}, response => {
+          console.log('next response back!', response)
+          if (response == undefined || response.next == url || Object.keys(response).length == 0) {
+            hook = setTimeout(ask, 1000)
+            return
+          }
+          // update info
+          self.querySelector("[name='title']").innerText = response.title
+          self.querySelector("[name='channel']").innerText = response.channel
+          self.querySelector("[name='avatar'").src = response.avatar
+          
+          // update control
+          let controlMount = self.querySelector('[name=controlMount]')
+          controlMount.firstElementChild.remove()
+          
+          let newControl = initControl(tabId, response, self)
+          controlMount.appendChild(newControl)
+        })
+      }, 700)
+    })
   }
 }
 

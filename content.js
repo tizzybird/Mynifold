@@ -63,18 +63,25 @@ function fetchCurrentInfo() {
                 console.log('in reject')
                 reject({error: true})
             }
-                
+            // console.log('avatar', document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer').querySelector('img').src)
             if (document.readyState != 'complete') {
                 counter++
                 timer = setTimeout(check, 300)
             }
-        }, 300)
+
+            let res =  document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer')
+            if (res == null || res.querySelector('img').src.length == 0) {
+                counter++
+                timer = setTimeout(check, 300)
+            }
+        }, 500)
         let url = window.location.href
         let result = {isPlaying, isInPip}
         result['title']     = document.querySelector('h1').children[0].innerText
         result['channel']   = document.querySelector('div#upload-info.style-scope').querySelector('a').innerText
         result['videoId']   = url.split("&")[0].split("v=")[1]
         result['next']      = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#thumbnail').href
+        result['nextTitle'] = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#video-title').innerText
         result['loop']      = video.loop
         result['avatar']    = document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer').querySelector('img').src
         console.log(result)
@@ -104,7 +111,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.control == 'unsetRepeat') {
         video.loop = false
     } else if (request.askInitInfo) {
-        console.log('receive')
+        console.log('received by content, sender is', sender)
         fetchCurrentInfo().then(res => {
             console.log(res)
             sendResponse(res)
