@@ -58,6 +58,18 @@ function showContent(item) {
   // app.replaceChild(document.querySelector('#list'), newDiv)
 }
 
+// multiple contents
+function showCards(data) {
+  const keys = Object.keys(data)
+  console.log('card data', data)
+
+  for (let key of keys) {
+    const currItem = data[key]
+    if (currItem.isActive)
+      addCard(currItem)
+  }
+}
+
 function addCard(currItem) {
   const listMount = document.querySelector('#listMount')
   let hook = setTimeout(function ask() {
@@ -89,22 +101,11 @@ function addCard(currItem) {
   }, 300)
 }
 
-// multiple contents
-function showCards(data) {
-  const keys = Object.keys(data)
-  console.log('card data', data)
-
-  for (let key of keys) {
-    const currItem = data[key]
-    if (currItem.isActive)
-      addCard(currItem)
-  }
-}
-
 function initControl(windowId, tabId, info, self) {
   let controlClone = controlTemplate.content.cloneNode(true)
   const gotoBtn = controlClone.querySelector("button[name='goto']")
   const pipBtn  = controlClone.querySelector("button[name='pip']")
+  const prevBtn = controlClone.querySelector("button[name='prev']")
   const playBtn = controlClone.querySelector("button[name='play']")
   const nextBtn = controlClone.querySelector("button[name='next']")
   const repeatBtn = controlClone.querySelector("button[name='repeat']")
@@ -112,7 +113,9 @@ function initControl(windowId, tabId, info, self) {
   playBtn.onclick   = onPlayClick(tabId, playBtn, info.isPlaying)
   gotoBtn.onclick   = onGotoClick(windowId, tabId)
   pipBtn.onclick    = onPipClick(tabId, pipBtn, info.isInPip)
-  nextBtn.onclick   = onNextClick(tabId, info.next, self)
+  // problem here: need to update new currItem to prev button
+  // prevBtn.onclick   = onPrevClick(tabId, )
+  nextBtn.onclick   = onNextClick(windowId, tabId, info.next, self)
   repeatBtn.onclick = onRepeatClick(tabId, repeatBtn, info.loop)
 
   nextBtn.title = info.nextTitle
@@ -198,14 +201,45 @@ function onPlayClick(tabId, btn, isPlaying) {
   }
 }
 
-function onNextClick(tabId, url, self) {
+function onNextClick(windowId, tabId, url, self) {
   return function() {
     chrome.tabs.update(tabId, {url}, function() {
-      console.log('clicked!')
+      console.log('next button clicked!')
       let hook = setTimeout(function ask() {
         chrome.tabs.sendMessage(tabId, {askInitInfo: true}, response => {
           console.log('next response back!', response)
           if (response == undefined || response.next == url || Object.keys(response).length == 0) {
+            hook = setTimeout(ask, 1000)
+            return
+          }
+          // update info
+          self.querySelector("[name='title']").innerText = response.title
+          self.querySelector("[name='channel']").innerText = response.channel
+          self.querySelector("[name='avatar'").src = response.avatar
+          
+          // update control
+          let controlMount = self.querySelector('[name=controlMount]')
+          let newControl = initControl(windowId, tabId, response, self)
+          controlMount.firstElementChild.remove()
+          controlMount.appendChild(newControl)
+        })
+      }, 700)
+    })
+  }
+}
+
+function onPrevClick(tabId, url, self) {
+  return function () {
+    chrome.runtime.sendMessage({
+      content: 'back',
+      tabId
+    }, response => {
+      console.log('prev button clicked!')
+      let hook = setTimeout(function ask() {
+        chrome.tabs.sendMessage(tabId, {askInitInfo: true}, response => {
+          console.log('prev response back!', response)
+          if (response == undefined || Object.keys(response).length == 0) {
+            // to do: history url should be as same as url
             hook = setTimeout(ask, 1000)
             return
           }

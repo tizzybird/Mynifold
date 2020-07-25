@@ -11,20 +11,23 @@ initialize()
 // });
 
 function initialize(isReset=false) {
-    console.log('initializing content script')
-    video = null
+    console.log('initializing content script..')
+    // video = null
     setPropagation = true
-    isPlaying = false
+    isPlaying = isReset ? true : false
     isInPip = false
-    let videoFetcher = setTimeout(function check1() {
-        console.log("fetching..")
-        video = document.querySelector('video')
-        
-        if (video == null)
-            videoFetcher = setTimeout(check1, 300)
-        else if (!isReset)
+
+    if (!isReset) {
+        let videoFetcher = setTimeout(function fetch() {
+            console.log("fetching the video..")
+            video = document.querySelector('video')
+            
+            if (video == null)
+                videoFetcher = setTimeout(fetch, 300)
+
             registerVideoEventHandlers(video)
-    }, 300)
+        }, 300)
+    }
 }
 
 function registerVideoEventHandlers(video) {
@@ -66,26 +69,27 @@ function fetchCurrentInfo() {
             // console.log('avatar', document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer').querySelector('img').src)
             if (document.readyState != 'complete') {
                 counter++
-                timer = setTimeout(check, 300)
+                timer = setTimeout(check, 500)
             }
 
-            let res =  document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer')
-            if (res == null || res.querySelector('img').src.length == 0) {
-                counter++
-                timer = setTimeout(check, 300)
-            }
+            // let res =  document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer')
+            // if (res == undefined || res.querySelector('img').src.length == 0) {
+            //     counter++
+            //     timer = setTimeout(check, 500)
+            // }
+
+            let url = window.location.href
+            let result = {isPlaying, isInPip}
+            result['title']     = document.querySelector('h1').children[0].innerText
+            result['channel']   = document.querySelector('div#upload-info.style-scope').querySelector('a').innerText
+            result['videoId']   = url.split("&")[0].split("v=")[1]
+            result['next']      = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#thumbnail').href
+            result['nextTitle'] = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#video-title').innerText
+            result['loop']      = video.loop
+            result['avatar']    = document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer').querySelector('img').src
+            console.log(result)
+            resolve(result)
         }, 500)
-        let url = window.location.href
-        let result = {isPlaying, isInPip}
-        result['title']     = document.querySelector('h1').children[0].innerText
-        result['channel']   = document.querySelector('div#upload-info.style-scope').querySelector('a').innerText
-        result['videoId']   = url.split("&")[0].split("v=")[1]
-        result['next']      = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#thumbnail').href
-        result['nextTitle'] = document.querySelector('ytd-compact-autoplay-renderer').querySelector('#video-title').innerText
-        result['loop']      = video.loop
-        result['avatar']    = document.querySelector('yt-img-shadow#avatar.ytd-video-owner-renderer').querySelector('img').src
-        console.log(result)
-        resolve(result)
     })
 }
 
@@ -93,7 +97,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.content == 'reset') {
         console.log('resetting content script')
         initialize(true)
-    }   
+        sendResponse({success: true})
+        return true
+    }
     
     if (request.control == 'play') {
         setPropagation = false
