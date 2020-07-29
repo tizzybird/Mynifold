@@ -1,38 +1,45 @@
 'use strict';
 
 const app = document.querySelector('#app')
+const listMount = document.querySelector('#listMount')
 const contentTemplate = document.querySelector('template#content')
 const cardTemplate = document.querySelector('template#card')
 const controlTemplate = document.querySelector('template#control')
+const excludeKeys = ['action']
 // when opening the popup
-chrome.storage.sync.get(['media'], function(data) {
+chrome.storage.sync.get(null, store => {
   // TODO: show default page
-  if (data.media == undefined)
-    return
-    
-  showCards(data.media)
+  showCards(store)
 });
 
 chrome.storage.onChanged.addListener(function(changes, namespace) {
-  console.log(changes, changes.action.newValue.operation)
-  if (changes.action.newValue.operation == 'create') {
-    // const listMount = document.querySelector('#listMount')
-    // while (listMount.firstElementChild)
-    //   listMount.removeChild(listMount.firstElementChild)
-    // showCards(changes.media.newValue)
-    addCard(changes.media.newValue[changes.action.newValue.item])
+  console.log('store change', changes)
+  for (let key in changes) {
+    if (excludeKeys.includes(key))
+      continue
+    
+    if (changes[key].newValue == undefined) {
+      // remove
+      document.getElementById(changes[key].oldValue.tabId).remove()
+    } if (changes[key].oldValue == undefined) {
+      // create
+      addCard(changes[key].newValue)
+    } else {
+      // update
+      updateCard(changes[key].newValue)
+    }
   }
 })
 
 // TODO: loading animation
 function setLoading(isLoading) {
-  const listMount = document.querySelector('#listMount')
   if (isLoading) {
   } else {
   }
 }
 
 // DEPRECATED: single content
+/*
 function showContent(item) {
   console.log('showing content')
   const clone = contentTemplate.content.cloneNode(true)
@@ -41,7 +48,7 @@ function showContent(item) {
   const pipBtn  = clone.querySelector("button[name='pip']")
   const repeatBtn = clone.querySelector("button[name='repeat']")
   gotoBtn.onclick   = onGotoClick(item.windowId, item.tabId)
-  chrome.tabs.sendMessage(item.tabId, {askInitInfo: true}, response => {
+  chrome.tabs.sendMessage(item.tabId, {ask: 'initInfo'}, response => {
     console.log(response)
     clone.querySelector('h3').innerText = response.title
     clone.querySelector('p').innerText = response.channel
@@ -51,47 +58,49 @@ function showContent(item) {
     repeatBtn.onclick = onRepeatClick(item.tabId, repeatBtn, response.loop)
     app.appendChild(clone)
   })
-  
-  // remove original cards
-  // let newDiv = document.createElement('div')
-  // newDiv.id = 'list'
-  // app.replaceChild(document.querySelector('#list'), newDiv)
 }
+*/
 
 // multiple contents
 function showCards(data) {
-  const keys = Object.keys(data)
   console.log('card data', data)
 
-  for (let key of keys) {
-    const currItem = data[key]
-    if (currItem.isActive)
-      addCard(currItem)
+  for (let key in data) {
+    if (excludeKeys.includes(key))
+      continue;
+
+    // if (data[key].isActive)
+    addCard(data[key])
   }
 }
 
 function addCard(currItem) {
-  const listMount = document.querySelector('#listMount')
+  console.log('adding a card...')
+  
   let hook = setTimeout(function ask() {
     // since this is async, the order may not be precise
-    chrome.tabs.sendMessage(currItem.tabId, {askInitInfo: true}, response => {
+    chrome.tabs.sendMessage(currItem.tabId, {ask: 'initInfo'}, response => {
       console.log(currItem.tabId, response)
       if (response == undefined || Object.keys(response).length == 0) {
-        hook = setTimeout(ask, 700)
+        hook = setTimeout(ask, 500)
         return
       }
-        
+
       let cardClone = cardTemplate.content.cloneNode(true)
-      
-      // init info
       cardClone.firstElementChild.id = currItem.tabId
       cardClone.querySelector("[name='title']").innerText = response.title
       cardClone.querySelector("[name='channel']").innerText = response.channel
-      cardClone.querySelector("[name='avatar'").src = response.avatar
       cardClone.querySelector("[name='cancel']").onclick = onCancelClick(currItem.tabId, cardClone.firstElementChild)
       // cardClone.querySelector('img').src = `https://img.youtube.com/vi/${response.videoId}/default.jpg`
       // cardClone.firstElementChild.firstElementChild.onclick = cardClickHandler()
       
+      let avatarElm = cardClone.querySelector("[name='avatar']")
+      if (response.avatar.length == 0) {
+        avatarFetcher(currItem.tabId, avatarElm)
+      } else {
+        avatarElm.src = response.avatar
+      }
+
       // init control
       const controlMount = cardClone.querySelector('[name=controlMount]')
       const controlClone = initControl(currItem.windowId, currItem.tabId, response, cardClone.firstElementChild)
@@ -99,6 +108,34 @@ function addCard(currItem) {
       listMount.appendChild(cardClone)
     })
   }, 300)
+}
+
+function updateCard(currItem) {
+  let card = document.getElementById(currItem.tabId)
+  let hook = setTimeout(function ask() {
+    chrome.tabs.sendMessage(currItem.tabId, {ask: 'initInfo'}, response => {
+      console.log(currItem.tabId, response)
+      if (response == undefined || Object.keys(response).length == 0 || response.next == currItem.url) {
+        hook = setTimeout(ask, 700)
+        return
+      }
+
+      card.querySelector("[name='title']").innerText = response.title
+      card.querySelector("[name='channel']").innerText = response.channel
+      let avatarElm = card.querySelector("[name='avatar']")
+      if (response.avatar.length == 0) {
+        avatarFetcher(currItem.tabId, avatarElm)
+      } else {
+        avatarElm.src = response.avatar
+      }
+      
+      // update control bar
+      let controlMount = card.querySelector('[name=controlMount]')
+      let newControl = initControl(currItem.windowId, currItem.tabId, response, card)
+      controlMount.firstElementChild.remove()
+      controlMount.appendChild(newControl)
+    })
+  })
 }
 
 function initControl(windowId, tabId, info, self) {
@@ -114,8 +151,9 @@ function initControl(windowId, tabId, info, self) {
   gotoBtn.onclick   = onGotoClick(windowId, tabId)
   pipBtn.onclick    = onPipClick(tabId, pipBtn, info.isInPip)
   // problem here: need to update new currItem to prev button
-  // prevBtn.onclick   = onPrevClick(tabId, )
-  nextBtn.onclick   = onNextClick(windowId, tabId, info.next, self)
+  prevBtn.onclick   = onPrevClick(tabId)
+  // nextBtn.onclick   = onNextClick(windowId, tabId, info.next, self)
+  nextBtn.onclick   = onNextClick(tabId, info.next)
   repeatBtn.onclick = onRepeatClick(tabId, repeatBtn, info.loop)
 
   nextBtn.title = info.nextTitle
@@ -125,9 +163,7 @@ function initControl(windowId, tabId, info, self) {
 
 function onCancelClick(tabId, self) {
   return function() {
-    chrome.tabs.remove(tabId, function() {
-      self.remove()
-    })
+    chrome.tabs.remove(tabId, () => { self.remove() })
   }
 }
 
@@ -201,70 +237,43 @@ function onPlayClick(tabId, btn, isPlaying) {
   }
 }
 
-function onNextClick(windowId, tabId, url, self) {
+function avatarFetcher(tabId, self) {
+  console.log('in avatar fetcher')
+  let hook = setTimeout(function fetch() {
+    chrome.tabs.sendMessage(tabId, {ask: 'avatar'}, response => {
+      console.log('avatar response', response)
+      if (response.error) {
+        hook = setTimeout(fetch, 1000)
+        return
+      }
+      self.src = response
+    })
+  }, 700)
+}
+
+function onNextClick(tabId, url) {
   return function() {
     chrome.tabs.update(tabId, {url}, function() {
       console.log('next button clicked!')
-      let hook = setTimeout(function ask() {
-        chrome.tabs.sendMessage(tabId, {askInitInfo: true}, response => {
-          console.log('next response back!', response)
-          if (response == undefined || response.next == url || Object.keys(response).length == 0) {
-            hook = setTimeout(ask, 1000)
-            return
-          }
-          // update info
-          self.querySelector("[name='title']").innerText = response.title
-          self.querySelector("[name='channel']").innerText = response.channel
-          self.querySelector("[name='avatar'").src = response.avatar
-          
-          // update control
-          let controlMount = self.querySelector('[name=controlMount]')
-          let newControl = initControl(windowId, tabId, response, self)
-          controlMount.firstElementChild.remove()
-          controlMount.appendChild(newControl)
-        })
-      }, 700)
     })
   }
 }
 
-function onPrevClick(tabId, url, self) {
+function onPrevClick(tabId) {
   return function () {
-    chrome.runtime.sendMessage({
-      content: 'back',
-      tabId
-    }, response => {
+    chrome.tabs.goBack(tabId, function() {
       console.log('prev button clicked!')
-      let hook = setTimeout(function ask() {
-        chrome.tabs.sendMessage(tabId, {askInitInfo: true}, response => {
-          console.log('prev response back!', response)
-          if (response == undefined || Object.keys(response).length == 0) {
-            // to do: history url should be as same as url
-            hook = setTimeout(ask, 1000)
-            return
-          }
-          // update info
-          self.querySelector("[name='title']").innerText = response.title
-          self.querySelector("[name='channel']").innerText = response.channel
-          self.querySelector("[name='avatar'").src = response.avatar
-          
-          // update control
-          let controlMount = self.querySelector('[name=controlMount]')
-          controlMount.firstElementChild.remove()
-          
-          let newControl = initControl(tabId, response, self)
-          controlMount.appendChild(newControl)
-        })
-      }, 700)
     })
   }
 }
 
 // message handler
-// todo: match corrresponding item
+// todo: match corresponding item
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const card = document.getElementById(sender.tab.id)
-  
+  if (card == null)
+    return
+
   if (request.videoEvent == 'playing' || request.videoEvent == 'pause') {
     const icon = card.querySelector("button[name='play']>i")
     icon.classList.toggle('fa-pause')

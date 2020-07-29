@@ -13,114 +13,98 @@ console.log("background is running")
 
 chrome.tabs.onRemoved.addListener(function(tabId, removeInfo) {
   console.log("closing", tabId, removeInfo)
-  chrome.storage.sync.get(['media'], data => {
-    let mediaItems = data.media || {}
-    if (mediaItems != undefined && mediaItems[tabId] != undefined) {
-      console.log('deleting ' + tabId)
-      delete mediaItems[tabId]
-      chrome.storage.sync.set({
-        media: mediaItems,
-        action: {
-          operation: 'delete',
-          item: tabId
-        }
-      }, function() {console.log("deletion done!")})
-    }
-  })
+  const key = `${tabId}`
+  chrome.storage.sync.remove(key)
 })
 
-// let watchList = []
 chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-  // console.log(tabId, changeInfo)
-  if (changeInfo.status == 'loading') {
-    if (changeInfo.url != undefined && changeInfo.url.match('youtube.com/watch.')) {
-      chrome.storage.sync.get(['media'], data => {
-        let mediaItems = data.media || {}
-
+  let key = 'item-' + tabId
+  if (changeInfo.status == 'loading' && changeInfo.url != undefined) {
+    if (changeInfo.url.match('youtube.com/watch.')) {
+      chrome.storage.sync.get(null, store => {
         // 1. not in store, create
-        if (mediaItems[tabId] == undefined) {
+        console.log(store, ' key is', key)
+        if (store[key] == undefined) {
           console.log('case1: creating!')
-          mediaItems[tabId] = {
-            tabId: tabId,
-            windowId: tab.windowId,
-            favIconUrl: tab.favIconUrl,
-            history: [],
-            url: tab.url,
-            isActive: true
-          }
-          chrome.tabs.executeScript(tabId, {file: 'content.js'}, response => {
-            chrome.storage.sync.set({
-              media: mediaItems,
-              action: {
-                operation: 'create',
-                item: tabId
+          chrome.storage.sync.set(
+            {
+              [key]: {
+                tabId: tabId,
+                windowId: tab.windowId,
+                // favIconUrl: tab.favIconUrl,
+                // history: [],
+                url: tab.url,
+                isActive: true
               }
-            })
-          })
-          
+            }, function() {
+              chrome.storage.sync.get(key, k => {console.log(k)})
+              if(chrome.runtime.lastError){
+                console.log('not Saved', chrome.runtime.lastError)
+              }  
+              chrome.tabs.executeScript(tabId, {file: 'content.js'})
+            }
+          )
         // 2. in store, reset; // send message to tabId
         } else {
           console.log('case2: resetting!')
-          let oldItem = mediaItems[tabId]
-          let newItem = {
+          let updatedItem = {
             tabId: tabId,
             windowId: tab.windowId,
-            favIconUrl: tab.favIconUrl,
-            history: oldItem.history,
+            // favIconUrl: tab.favIconUrl,
+            // history: item.history,
             url: tab.url,
             isActive: true
           }
-          newItem.history.push(oldItem.url)
-          mediaItems[tabId] = newItem
-
           chrome.tabs.sendMessage(tabId, {content: 'reset'}, response => {
             // reset error, content script doesn't exist
             if (response == undefined) {
               console.log('case2.1: recreating')
               chrome.tabs.executeScript(tabId, {file: 'content.js'}, response => {
                 chrome.storage.sync.set({
-                  media: mediaItems,
-                  action: {
-                    operation: 'recreate',
-                    item: tabId
-                  }
+                  [key]: updatedItem
+                  // action: {
+                  //   operation: 'recreate',
+                  //   item: key
+                  // }
                 })
               })
             } else {
               console.log('case2.2: reconnecting')
               chrome.storage.sync.set({
-                media: mediaItems,
-                action: {
-                  operation: 'reset',
-                  item: tabId
-                }
-              })  
+                [key]: updatedItem
+                // action: {
+                //   operation: 'reconnect',
+                //   item: key
+                // }
+              })
             }
           })
         }
       })
     } else {
-      chrome.storage.sync.get(['media'], data => {
-        let mediaItems = data.media || {}
-        // 3. update status of the mediaItem
-        if (mediaItems != undefined && mediaItems[tabId] != undefined) {
-          mediaItems[tabId]['isActive'] = false
-          // todo: history
-          console.log('case3: turnning inactive')
-          chrome.storage.sync.set({
-            media: mediaItems,
-            action: {
-              operation: 'freeze',
-              item: tabId
-            }
-          })
-        }
-        // 4. nothing match, do nothing
-      })
+      console.log('case3: updating', changeInfo)
+      chrome.storage.sync.remove(key)
+      // chrome.storage.sync.get(['media'], data => {
+      //   let mediaItems = data.media || {}
+      //   // 3. update status of the mediaItem
+      //   if (mediaItems != undefined && mediaItems[tabId] != undefined) {
+      //     mediaItems[tabId]['isActive'] = false
+      //     // todo: history
+      //     chrome.storage.sync.set({
+      //       media: mediaItems,
+      //       action: {
+      //         operation: 'freeze',
+      //         item: tabId
+      //       }
+      //     })
+      //   }
+      //   // 4. nothing match, do nothing
+      // })
     }
   }
 })
 
+/*
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.content == 'back') {
     console.log('going to prev url')
@@ -143,3 +127,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true
   }
 })
+*/

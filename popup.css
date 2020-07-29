@@ -198,7 +198,7 @@ button:focus {
     font-size: 14px;
 }
 .small>.control-bar>.control-panel>.control-btn.mid {
-    margin: 0px 15px;
+    margin: 0px 13px;
     padding: 6px 7px 5px 8px;
 }
 
@@ -279,12 +279,13 @@ button:focus {
     margin-left: -1rem;
     /* background-color: var(--theme-color); */
     visibility: hidden;
-    background-color: black;
+    background-color: var(--control-color);
+    opacity: 0.8;
     color: white;
     border: 1.5px solid hsla(0,0%,100%,.5);
 }
 .cancel-btn:hover {
-    background-color: var(--theme-color);
+    opacity: 1;
     cursor: pointer;
 }
 .card:hover>.cancel-btn {
