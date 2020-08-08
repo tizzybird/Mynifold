@@ -1,7 +1,7 @@
 {
-  "name": "Getting Started",
-  "version": "1.0",
-  "description": "Build an Extension",
+  "name": "Mynifold",
+  "version": "1.1",
+  "description": "Help you manage your Youtube tabs.",
   "permissions": [
     "tabs",
     "activeTab",
