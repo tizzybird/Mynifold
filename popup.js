@@ -6,6 +6,7 @@ const contentTemplate = document.querySelector('template#content')
 const cardTemplate = document.querySelector('template#card')
 const controlTemplate = document.querySelector('template#control')
 const excludeKeys = ['action']
+const defaultPicPath = 'images/logo48.png'
 // when opening the popup
 chrome.storage.sync.get(null, store => {
   // TODO: show default page
@@ -20,8 +21,10 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
     
     if (changes[key].newValue == undefined) {
       // remove
-      document.getElementById(changes[key].oldValue.tabId).remove()
-    } if (changes[key].oldValue == undefined) {
+      let card = document.getElementById(changes[key].oldValue.tabId)
+      if (card != null)
+        card.remove()
+    } else if (changes[key].oldValue == undefined) {
       // create
       addCard(changes[key].newValue)
     } else {
@@ -38,29 +41,6 @@ function setLoading(isLoading) {
   }
 }
 
-// DEPRECATED: single content
-/*
-function showContent(item) {
-  console.log('showing content')
-  const clone = contentTemplate.content.cloneNode(true)
-  const playBtn = clone.querySelector("button[name='mid']")
-  const gotoBtn = clone.querySelector("button[name='goto']")
-  const pipBtn  = clone.querySelector("button[name='pip']")
-  const repeatBtn = clone.querySelector("button[name='repeat']")
-  gotoBtn.onclick   = onGotoClick(item.windowId, item.tabId)
-  chrome.tabs.sendMessage(item.tabId, {ask: 'initInfo'}, response => {
-    console.log(response)
-    clone.querySelector('h3').innerText = response.title
-    clone.querySelector('p').innerText = response.channel
-    clone.querySelector('img').src = `https://img.youtube.com/vi/${response.videoId}/mqdefault.jpg`
-    playBtn.onclick   = onPlayClick(item.tabId, playBtn, response.isPlaying)
-    pipBtn.onclick    = onPipClick(item.tabId, pipBtn, response.isInPip)
-    repeatBtn.onclick = onRepeatClick(item.tabId, repeatBtn, response.loop)
-    app.appendChild(clone)
-  })
-}
-*/
-
 // multiple contents
 function showCards(data) {
   console.log('card data', data)
@@ -69,7 +49,6 @@ function showCards(data) {
     if (excludeKeys.includes(key))
       continue;
 
-    // if (data[key].isActive)
     addCard(data[key])
   }
 }
@@ -96,6 +75,7 @@ function addCard(currItem) {
       
       let avatarElm = cardClone.querySelector("[name='avatar']")
       if (response.avatar.length == 0) {
+        avatarElm.src = defaultPicPath
         avatarFetcher(currItem.tabId, avatarElm)
       } else {
         avatarElm.src = response.avatar
@@ -111,7 +91,12 @@ function addCard(currItem) {
 }
 
 function updateCard(currItem) {
+  console.log('updating a card...')
   let card = document.getElementById(currItem.tabId)
+  if (card == null) {
+    console.log('card is null', currItem)
+    return
+  }
   let hook = setTimeout(function ask() {
     chrome.tabs.sendMessage(currItem.tabId, {ask: 'initInfo'}, response => {
       console.log(currItem.tabId, response)
@@ -119,16 +104,17 @@ function updateCard(currItem) {
         hook = setTimeout(ask, 700)
         return
       }
-
+      console.log("success, keep going", card)
       card.querySelector("[name='title']").innerText = response.title
       card.querySelector("[name='channel']").innerText = response.channel
       let avatarElm = card.querySelector("[name='avatar']")
       if (response.avatar.length == 0) {
+        avatarElm.src = defaultPicPath
         avatarFetcher(currItem.tabId, avatarElm)
       } else {
         avatarElm.src = response.avatar
       }
-      
+      console.log("updating control bar")
       // update control bar
       let controlMount = card.querySelector('[name=controlMount]')
       let newControl = initControl(currItem.windowId, currItem.tabId, response, card)
@@ -239,31 +225,36 @@ function onPlayClick(tabId, btn, isPlaying) {
 
 function avatarFetcher(tabId, self) {
   console.log('in avatar fetcher')
+  let count = 0
   let hook = setTimeout(function fetch() {
     chrome.tabs.sendMessage(tabId, {ask: 'avatar'}, response => {
-      console.log('avatar response', response)
+      console.log('avatar response', counter, response)
+      if (count == 3) {
+        console.log('failed to fetch avatar')
+        return
+      }
+        
       if (response.error) {
-        hook = setTimeout(fetch, 1000)
+        count++
+        hook = setTimeout(fetch, 3000)
         return
       }
       self.src = response
     })
-  }, 700)
+  }, 500)
 }
 
 function onNextClick(tabId, url) {
   return function() {
-    chrome.tabs.update(tabId, {url}, function() {
-      console.log('next button clicked!')
-    })
+    console.log('next button clicked!')
+    chrome.tabs.update(tabId, {url})
   }
 }
 
 function onPrevClick(tabId) {
   return function () {
-    chrome.tabs.goBack(tabId, function() {
-      console.log('prev button clicked!')
-    })
+    console.log('prev button clicked!')
+    chrome.tabs.goBack(tabId)
   }
 }
 
@@ -283,3 +274,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     card.querySelector("button[name='pip']").classList.toggle('active')
   }
 })
+
+/*
+// chapter in the video
+<div class="ytp-chapter-container" style="max-width: 216px;">
+  <button class="ytp-chapter-title ytp-button ytp-chapter-container-disabled" title="查看章節" aria-label="查看章節" disabled="">
+    <span class="ytp-chapter-title-prefix" aria-hidden="true">•</span>
+    <div class="ytp-chapter-title-content">
+      A Place In Heaven (Album: Illusions)
+    </div>
+    <div class="ytp-chapter-title-chevron">
+      <svg height="100%" viewBox="0 0 24 24" width="100%">
+        <path d="M9.71 18.71l-1.42-1.42 5.3-5.29-5.3-5.29 1.42-1.42 6.7 6.71z" fill="#fff"></path>
+      </svg>
+    </div>
+  </button>
+</div>
+*/

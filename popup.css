@@ -32,7 +32,7 @@ button:focus {
     height: 500px;
     /* height: 300px; */
     width: 380px;
-    padding: 16px 3px 16px 12px;
+    padding: 16px 3px 0px 12px;
     background-color: var(--bg-color);
     color: var(--default-color);
     display: flex;
@@ -44,6 +44,9 @@ button:focus {
     letter-spacing: 0.02em;
     margin: 1px 5px 10px 5px;
     z-index: 1;
+}
+.container>.feedback {
+    padding: 6px 0px 8px 5px;
 }
 /* info panel */
 .info-panel {
@@ -175,6 +178,7 @@ button:focus {
     margin-right: 10px;
     max-width: 42px;
     border-radius: 50%;
+    background-color:var(--description-color);
 }
 .card-title {
     font-size: 16px;
